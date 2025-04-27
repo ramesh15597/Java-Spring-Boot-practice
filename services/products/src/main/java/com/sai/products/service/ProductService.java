@@ -1,11 +1,18 @@
 package com.sai.products.service;
 
+import com.sai.products.dto.ProductPurchaseRequest;
+import com.sai.products.dto.ProductPurchaseResponse;
+import com.sai.products.dto.ProductRequest;
+import com.sai.products.dto.ProductResponse;
+import com.sai.products.model.Category;
+import com.sai.products.model.Product;
 import com.sai.products.repository.ProductRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang.StringUtils;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import static java.lang.String.format;
@@ -16,95 +23,93 @@ public class ProductService {
 
     private final ProductRepository repository;
 
-    public String createCustomer(CustomerRequest request) {
+    public Integer createProduct(ProductRequest request) {
 
-        Customer customer = Customer.builder()
-                .id(request.id())
-                .firstName(request.firstName())
-                .lastName(request.lastName())
-                .email(request.email())
-                .address(request.address())
+        Product product = Product.builder()
+                .id(request.getId())
+                .name(request.getName())
+                .price(request.getPrice())
+                .category(Category.builder().
+                        id(request.getCategory_id())
+                        .build())
                 .build();
-        repository.save(customer);
+        repository.save(product);
 
-        return request.id();
+        return request.getId();
 
     }
 
-    public String updateCustomer(@Valid CustomerRequest request) {
+    public List<ProductPurchaseResponse> purchaseProducts(@Valid List<ProductPurchaseRequest> request) throws Exception {
 
-        Customer customer = repository.findById(request.id()).orElseThrow(() -> new CustomerNotFoundException(
-                format("Customer id " + request.id() + " Not Found")
+        List<Integer> productIdList = request.stream().map(ProductPurchaseRequest::getId)
+                .toList();
+
+        List<Product> storedProducts = repository.findAllByIdInOrderById(productIdList);
+
+        if (storedProducts.size() != productIdList.size()) {
+            throw new Exception("One or more product does not exists");
+        }
+        List<ProductPurchaseRequest> storedRequest = request.stream()
+                .sorted(Comparator.comparing(ProductPurchaseRequest::getId)).toList();
+
+        List<ProductPurchaseResponse> purchaseResponseList = new ArrayList<>();
+
+        for (int i = 0; i < storedProducts.size(); i++) {
+
+            Product product = storedProducts.get(i);
+            ProductPurchaseRequest productRequest = storedRequest.get(i);
+
+            if (product.getAvailableQuantity()<productRequest.getQuantity()){
+                throw new Exception("In Sufficient quantity for product with Id -->"+productRequest.getId());
+            }
+
+            product.setAvailableQuantity(product.getAvailableQuantity()-productRequest.getQuantity());
+
+            repository.save(product);
+
+            purchaseResponseList.add(ProductPurchaseResponse.builder()
+                            .productId(product.getId())
+                            .name(product.getName())
+                            .description(product.getDescription())
+                            .quantity(product.getAvailableQuantity())
+                            .price(product.getPrice())
+                    .build());
+        }
+
+
+        return null;
+
+    }
+
+    public ProductResponse findById(Integer productId) throws Exception {
+        return repository.findById(String.valueOf(productId)).map(
+                product -> ProductResponse.builder()
+                        .id(product.getId())
+                        .name(product.getName())
+                        .description(product.getDescription())
+                        .availableQuantity(product.getAvailableQuantity())
+                        .price(product.getPrice())
+                        .category_id(product.getCategory().getId())
+                        .categoryName(product.getCategory().getName())
+                        .categoryDescription(product.getCategory().getDescription())
+                        .build()).orElseThrow(() -> new Exception(
+                format("product Id " + productId + " Not Found")
 
         ));
-
-        mergeCustomer(customer, request);
-        repository.save(customer);
-        return "Customer id " + request.id() + "Updated";
     }
 
-    private void mergeCustomer(Customer customer, @Valid CustomerRequest request) {
-
-        if (StringUtils.isNotBlank(request.firstName())) {
-            customer.setFirstName(request.firstName());
-        }
-        if (StringUtils.isNotBlank(request.lastName())) {
-            customer.setLastName(request.lastName());
-        }
-        if (StringUtils.isNotBlank(request.email())) {
-            customer.setEmail(request.email());
-        }
-        if (null != request.address()) {
-            customer.setAddress(request.address());
-        }
-
-    }
-
-    public List<CustomerResponse> getCustomers() {
-
-
+    public List<ProductResponse> findAll() {
         return repository.findAll().stream().map(
-
-                a -> new CustomerResponse(a.getId(), a.getFirstName(),
-                        a.getLastName(),
-                        a.getEmail(),
-                        a.getAddress()
-                )
-
-        ).toList();
-    }
-
-    public Boolean existsById(String customerId) {
-        return repository.existsById(customerId);
-    }
-
-    public CustomerResponse findById(String customerId) {
-        return repository.findById(customerId).map(
-                a -> new CustomerResponse(
-                        a.getId(),
-                        a.getFirstName(),
-                        a.getLastName(),
-                        a.getEmail(),
-                        a.getAddress()
-
-                )
-
-
-        ).orElseThrow(() -> new CustomerNotFoundException(
-                format("Customer id " + customerId + " Not Found")
-
-        ));
-    }
-
-    public String deleteCustById(String customerId) {
-        Boolean flag = existsById(customerId);
-
-        if(flag){
-            repository.deleteById(customerId);
-            return format("Customer id " + customerId + " deleted !!!");
-        }else {
-            return format("Customer id " + customerId + " Not Found");
-        }
+                product -> ProductResponse.builder()
+                        .id(product.getId())
+                        .name(product.getName())
+                        .description(product.getDescription())
+                        .availableQuantity(product.getAvailableQuantity())
+                        .price(product.getPrice())
+                        .category_id(product.getCategory().getId())
+                        .categoryName(product.getCategory().getName())
+                        .categoryDescription(product.getCategory().getDescription())
+                        .build()).toList();
 
     }
 }

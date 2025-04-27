@@ -14,7 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/customer")
 @RequiredArgsConstructor
-public class ProductController {
+public class CustomerController {
 
     private final CustomerService customerService;
 
