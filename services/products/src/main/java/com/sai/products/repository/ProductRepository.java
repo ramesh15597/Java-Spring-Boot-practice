@@ -1,10 +1,13 @@
 package com.sai.products.repository;
 
 import com.sai.products.model.Product;
-import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-@Repository
-public interface ProductRepository extends CrudRepository<Product, String> {
+import java.util.List;
 
+@Repository
+public interface ProductRepository extends JpaRepository<Product, String> {
+
+    List<Product> findAllByIdInOrderById(List<Integer> productIdList);
 }
